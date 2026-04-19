@@ -213,10 +213,16 @@ export default async function Home() {
 
         <div className="grid gap-6 md:grid-cols-3">
           {/* FREE */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-7">
+          <div className="rounded-2xl border border-slate-200 bg-white p-7 relative">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold text-white whitespace-nowrap">
+              Versão Beta — 3 meses grátis
+            </div>
             <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Free</p>
-            <p className="mt-3 text-4xl font-bold text-slate-900">R$ 0</p>
-            <p className="text-slate-500 text-sm mt-1">para sempre</p>
+            <div className="mt-3 flex items-baseline gap-2">
+              <p className="text-4xl font-bold text-slate-900">R$ 0</p>
+              <p className="text-lg font-medium text-slate-400 line-through">R$ 49</p>
+            </div>
+            <p className="text-slate-500 text-sm mt-1">por 3 meses · 100% de desconto</p>
             <ul className="mt-6 space-y-3 text-sm text-slate-600">
               {['1 unidade consumidora', '3 faturas/mês', 'Análise básica', 'Insights de economia'].map((i) => (
                 <li key={i} className="flex items-center gap-2">
