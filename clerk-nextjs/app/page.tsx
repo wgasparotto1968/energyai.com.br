@@ -240,9 +240,14 @@ export default async function Home() {
           </div>
 
           {/* PRO */}
-          <div className="rounded-2xl border-2 border-green-500 bg-white p-7 shadow-lg shadow-green-500/10 relative">
+          <div className="rounded-2xl border-2 border-green-500 bg-white p-7 shadow-lg shadow-green-500/10 relative overflow-hidden">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-green-500 px-3 py-1 text-xs font-semibold text-white">
               Mais popular
+            </div>
+            {/* Em breve overlay */}
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] flex flex-col items-center justify-center z-10 rounded-2xl">
+              <span className="text-2xl font-bold text-slate-700">Em breve</span>
+              <span className="mt-1 text-sm text-slate-500">Lançamento em 06/2026</span>
             </div>
             <p className="text-sm font-semibold text-green-600 uppercase tracking-wide">Pro</p>
             <p className="mt-3 text-4xl font-bold text-slate-900">R$ 49</p>
@@ -272,7 +277,12 @@ export default async function Home() {
           </div>
 
           {/* ENTERPRISE */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-7">
+          <div className="rounded-2xl border border-slate-200 bg-white p-7 relative overflow-hidden">
+            {/* Em breve overlay */}
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] flex flex-col items-center justify-center z-10 rounded-2xl">
+              <span className="text-2xl font-bold text-slate-700">Em breve</span>
+              <span className="mt-1 text-sm text-slate-500">Lançamento em 06/2026</span>
+            </div>
             <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Enterprise</p>
             <p className="mt-3 text-4xl font-bold text-slate-900">Custom</p>
             <p className="text-slate-500 text-sm mt-1">sob consulta</p>
