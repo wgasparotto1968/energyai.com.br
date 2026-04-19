@@ -74,129 +74,6 @@ const MESES_ABREV: Record<string, number> = {
 }
 
 /**
- * Extrai histórico de consumo de faturas Grupo B (residencial/comercial BT).
- *
- * Suporta dois formatos CELESC:
- *   1. "CON GTP 581 0 557 0 703 0 ..." — pares (consumo, injetado) após rótulo CON GTP,
- *      com cabeçalho de meses numa linha anterior (MAR/26 FEV/26 ...).
- *   2. Inline: "JAN/26 317 31 DEZ/25 361 31 ..." — cada mês seguido de (consumo, dias_faturados).
- */
-export function extrairHistoricoGrupoB(texto: string): EntradaHistorico[] {
-  const t = texto.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-
-  // ── Estratégia 1: "CON GTP" (CELESC com/sem net metering) ──────────
-  // Cabeçalho de meses aparece numa linha separada: "MAR/26 FEV/26 JAN/26 ..."
-  // Linha de valores: "CON GTP 581 0 557 0 703 0 ..."
-  const conGtpMatch = /\bCON\s+GTP\b\s+((?:\d+\s*)+)/i.exec(t)
-  if (conGtpMatch) {
-    // Coleta meses que aparecem antes do CON GTP
-    const antesConGtp = t.slice(0, conGtpMatch.index)
-    const mesRe2 = /(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\/(\d{2,4})/gi
-    const seen2 = new Set<string>()
-    const mesesHdr: Array<{ mes: number; ano: number }> = []
-    for (const m of antesConGtp.matchAll(mesRe2)) {
-      const k = `${m[1].toUpperCase()}/${m[2]}`
-      if (!seen2.has(k)) {
-        seen2.add(k)
-        const anoRaw = parseInt(m[2])
-        mesesHdr.push({ mes: MESES_ABREV[m[1].toUpperCase()], ano: anoRaw < 100 ? 2000 + anoRaw : anoRaw })
-      }
-    }
-    const nums = conGtpMatch[1].trim().split(/\s+/).map(Number).filter(n => !isNaN(n))
-    // Detecta padrão em pares (consumo, injetado): ímpares são 0 ou muito baixos
-    const pares  = nums.filter((_, i) => i % 2 === 0)
-    const impares = nums.filter((_, i) => i % 2 === 1)
-    const ehPar = impares.length > 0 && impares.every(v => v < 50)
-    const consumos = ehPar ? pares : nums.filter(v => v > 33 && v < 99999)
-
-    const N = Math.min(mesesHdr.length, consumos.length)
-    if (N >= 2) {
-      return mesesHdr.slice(0, N)
-        .map((m, i) => ({ ...m, consumoTotalKwh: consumos[i] > 0 ? consumos[i] : undefined }))
-        .filter(e => e.consumoTotalKwh != null) as EntradaHistorico[]
-    }
-  }
-
-  // ── Estratégia 2: Inline "MMM/YY consumo dias_faturados" ──────────
-  // Ex: "JAN/26 317 31 DEZ/25 361 31 NOV/25 322 30 ..."
-  const inlineRe = /(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\/(\d{2,4})\s+(\d{2,4})\s+(\d{1,2})\b/gi
-  const inlineMatches = [...t.matchAll(inlineRe)]
-  if (inlineMatches.length >= 2) {
-    const result: EntradaHistorico[] = []
-    const seenInline = new Set<string>()
-    for (const m of inlineMatches) {
-      const mesAbr = m[1].toUpperCase()
-      const anoRaw = parseInt(m[2])
-      const ano = anoRaw < 100 ? 2000 + anoRaw : anoRaw
-      const consumo = parseInt(m[3])
-      const dias = parseInt(m[4])
-      const key = `${mesAbr}/${ano}`
-      if (!seenInline.has(key) && dias >= 25 && dias <= 35 && consumo > 30) {
-        seenInline.add(key)
-        result.push({ mes: MESES_ABREV[mesAbr], ano, consumoTotalKwh: consumo })
-      }
-    }
-    if (result.length >= 2) return result
-  }
-
-  // ── Estratégia 3: Block format (CELESC Grupo B padrão) ─────────────
-  // "Dias Faturados JAN/26 DEZ/25 NOV/25 ... FEV/25 317 361 322 ... 357 31 31 30 ..."
-  // Todos os meses aparecem juntos (cluster), depois todos os valores de consumo, depois os dias.
-  {
-    const monthRe3 = /(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\/(\d{2})\b/gi
-    const allM = [...t.matchAll(monthRe3)]
-    if (allM.length >= 3) {
-      // Agrupa meses em clusters (gap ≤ 30 chars entre meses consecutivos)
-      const clusters: RegExpMatchArray[][] = []
-      let curr: RegExpMatchArray[] = [allM[0]]
-      for (let i = 1; i < allM.length; i++) {
-        const gap = allM[i].index! - (allM[i - 1].index! + allM[i - 1][0].length)
-        if (gap <= 30) {
-          curr.push(allM[i])
-        } else {
-          clusters.push([...curr])
-          curr = [allM[i]]
-        }
-      }
-      clusters.push(curr)
-
-      // Maior cluster = cabeçalho do histórico
-      const cluster = clusters.reduce((a, b) => (a.length >= b.length ? a : b))
-      if (cluster.length >= 3) {
-        const N = cluster.length
-        const lastM = cluster[N - 1]
-        const afterEnd = lastM.index! + lastM[0].length
-
-        // Delimita até o próximo mês (para evitar capturar meses de outras seções)
-        const nextMonth = allM.find(m => m.index! > afterEnd)
-        const limit = nextMonth ? nextMonth.index! : afterEnd + 600
-        const segment = t.slice(afterEnd, limit)
-
-        // Extrai inteiros 2-4 dígitos (ignorando floats/reais com vírgula)
-        const nums = [...segment.matchAll(/\b(\d{2,4})\b/g)].map(m => parseInt(m[1], 10))
-
-        if (nums.length >= N) {
-          // Primeiros N números = consumo mensal
-          const result: EntradaHistorico[] = []
-          for (let i = 0; i < N; i++) {
-            const mesAbr = cluster[i][1].toUpperCase()
-            const anoRaw = parseInt(cluster[i][2], 10)
-            const ano = anoRaw < 100 ? 2000 + anoRaw : anoRaw
-            const consumo = nums[i]
-            if (consumo > 0 && consumo < 9999) {
-              result.push({ mes: MESES_ABREV[mesAbr], ano, consumoTotalKwh: consumo })
-            }
-          }
-          if (result.length >= 3) return result
-        }
-      }
-    }
-  }
-
-  return []
-}
-
-/**
  * Extrai a tabela "HISTÓRICO DE CONSUMO" de faturas CELESC/similares.
  * Retorna até 12 entradas mensais com consumo e demanda.
  *
@@ -418,6 +295,10 @@ export function extrairDadosFatura(texto: string): DadosFatura {
     /valor\s+a\s+pagar[\s\S]{0,20}R\$\s*([\d.,]+)/i,
     // CELESC: "TOTAL 1.891,90" no final
     /\bTOTAL\s+([\d.]+,\d{2})\b/i,
+    // CELESC alternativo: "Valor a Pagar 1.234,56" ou "Valor Documento 1.234,56"
+    /valor\s+(?:a\s+pagar|documento)[\s:]+([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2})/i,
+    // CELESC boleto: "(=) Valor do Documento 1.234,56"
+    /\(=\)\s*[\w\s]+?\s+([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2})\s*$/im,
     // COPEL/CEMIG: "R$2.845,86" isolado após data (antes de "Nome")
     /R\$\s*([\d.]+,\d{2})\s*(?:Nome|Endere|NOME)/i,
     // Genérico: R$ seguido de valor grande (>= 3 dígitos)
@@ -426,18 +307,14 @@ export function extrairDadosFatura(texto: string): DadosFatura {
   )
 
   // ── Consumo kWh ───────────────────────────────────────────────────
-  // CELESC divide o consumo em múltiplas linhas por faixa de ICMS:
-  //   (0D) Consumo TE KWH 150,000  ← ICMS 12%
-  //   (0D) Consumo TE KWH 412,000  ← ICMS 17%
-  // O total correto é a SOMA de todas as ocorrências.
-  const celescTeMatches = [...t.matchAll(/\(0D\)\s*Consumo\s+TE\s*KWH\s+([\d.]+,?\d*)/gi)]
-  if (celescTeMatches.length > 0) {
-    dados.consumoKwh = celescTeMatches.reduce((sum, m) => sum + (parseFloat2(m[1]) ?? 0), 0)
-  }
-
-  if (dados.consumoKwh == null)
   dados.consumoKwh = matchFloat(t,
+    // CELESC: "(0D) Consumo TE KWH 2.652,000"
     /\(0[DE]\)\s*Consumo\s+TE\s*KWH\s+([\d.]+,?\d*)/i,
+    // CELESC Grupo B: "Consumo de Energia Elétrica kWh 450" ou "Energia Elétrica kWh 450"
+    /Energia\s+El[eé]trica\s+kWh\s+([\d.,]+)/i,
+    /Consumo\s+de\s+Energia\s+El[eé]trica\s+kWh\s+([\d.,]+)/i,
+    // CELESC boleto visual: "KWH 450" precedido de Consumo
+    /consumo[\s\S]{0,10}(\d{2,5})\s*KWH/i,
     // COPEL Grupo A: soma ponta + fora-ponta — extrai ponta primeiro
     /ENERGIA\s+ELETRICA\s+TE\s+(?:F\s+)?PONTA[\s\S]{0,30}kWh\s+([\d.,]+)/i,
     // Padrões genéricos
@@ -562,7 +439,12 @@ export function extrairDadosFatura(texto: string): DadosFatura {
     if (dados.subgrupo.startsWith('B')) dados.grupo = 'B'
     if (dados.subgrupo.startsWith('A')) dados.grupo = 'A'
   }
-
+  // Inferência de grupo: se nenhum indicador de Grupo A foi encontrado, assume Grupo B
+  // (Grupo B é residencial/comercial — a grande maioria das faturas)
+  if (!dados.grupo) {
+    const temGrupoA = /modalidade\s*(verde|azul)|demanda\s+contratada|ponta\s*\(PT\)|fora\s+ponta\s*\(FP\)|horosazonal/i.test(t)
+    if (!temGrupoA) dados.grupo = 'B'
+  }
   // Tipo ligação
   if (/trifásico|trifasico|trif[áa]sico/i.test(t)) dados.tipoLigacao = 'Trifásico'
   else if (/bifásico|bifasico|bif[áa]sico/i.test(t)) dados.tipoLigacao = 'Bifásico'
@@ -577,34 +459,13 @@ export function extrairDadosFatura(texto: string): DadosFatura {
 
   // ── Endereço da UC ────────────────────────────────────────────────
   // Tenta extrair o endereço de instalação/entrega de vários formatos
-  //
-  // CELESC: OCR lê colunas fora de ordem — o endereço aparece ANTES do label "ENDERECO:"
-  // Padrão: "CPF/CNPJ: ***XXX-** CPF/CNPJ: SAO PEDRO 78 - PACHECOS B ARIRIU-PH ENDERECO: 88135-077..."
-  // A 2ª ocorrência de "CPF/CNPJ: " é seguida diretamente pelo endereço (começa com letra/dígito, não asterisco)
-  const celescEnderecoMatch = /CPF\/CNPJ:\s+([A-Z0-9][^]{5,100}?)\s+ENDERE[ÇC]O/i.exec(t)
-  if (celescEnderecoMatch) {
-    dados.enderecoUC = celescEnderecoMatch[1].trim().replace(/\s+/g, ' ')
-  } else {
-    const enderecoMatch =
-      /endere[çc]o\s+de\s+entrega[:\s]+([^\n]{5,80})/i.exec(t)
-      ?? /local\s+de\s+consumo[:\s]+([^\n]{5,80})/i.exec(t)
-      ?? /local\s+de\s+fornecimento[:\s]+([^\n]{5,80})/i.exec(t)
-      ?? /instala[çc][ãa]o[:\s]+([^\n]{5,80})/i.exec(t)
-      ?? /endere[çc]o[:\s]+([^\n]{5,120})/i.exec(t)
-    if (enderecoMatch) {
-      const raw = enderecoMatch[1].trim().replace(/\s+/g, ' ')
-      const truncado = raw
-        .replace(/\s*-?\s*CEP[:\s].*/i, '')
-        .replace(/\s*\d{5}-\d{3}.*/i, '')
-        .replace(/\s*-?\s*CIDADE[:\s].*/i, '')
-        .replace(/\s*-?\s*CPF[:/].*/i, '')
-        .replace(/\s*-?\s*CNPJ[:/].*/i, '')
-        .replace(/\s*-?\s*Grupo\/Subgrupo.*/i, '')
-        .replace(/\s*-?\s*\d{2}\/\d{2}\/\d{4}.*/i, '')
-        .trim()
-      if (truncado.length >= 5) dados.enderecoUC = truncado
-    }
-  }
+  const enderecoMatch =
+    /endere[çc]o\s+de\s+entrega[:\s]+([^\n]{5,80})/i.exec(t)
+    ?? /local\s+de\s+consumo[:\s]+([^\n]{5,80})/i.exec(t)
+    ?? /local\s+de\s+fornecimento[:\s]+([^\n]{5,80})/i.exec(t)
+    ?? /instala[çc][ãa]o[:\s]+([^\n]{5,80})/i.exec(t)
+    ?? /endere[çc]o[:\s]+([^\n]{5,80})/i.exec(t)
+  if (enderecoMatch) dados.enderecoUC = enderecoMatch[1].trim().replace(/\s+/g, ' ')
 
   // Tarifa energia (R$/kWh)
   dados.tarifaEnergia = matchFloat(t,
@@ -622,8 +483,7 @@ export function extrairDadosFatura(texto: string): DadosFatura {
   if (ncMatch) dados.numeroCliente = ncMatch[1].trim()
 
   // ── Distribuidora ─────────────────────────────────────────────────
-  // Busca apenas no cabeçalho do texto (primeiros 2000 chars) para evitar
-  // falsos positivos — ex: CELESC invoice pode citar COPEL em notas de rodapé
+  // Prioridade: primeiros 2000 chars (cabeçalho). Fallback: texto completo.
   const cabecalho = t.slice(0, 2000)
   const distribuidoras: [RegExp, string][] = [
     [/CELESC/i, 'CELESC'],       // SC — antes de COPEL/COPEL-D para evitar conflito
@@ -650,6 +510,12 @@ export function extrairDadosFatura(texto: string): DadosFatura {
   ]
   for (const [re, nome] of distribuidoras) {
     if (re.test(cabecalho)) { dados.distribuidora = nome; break }
+  }
+  // Fallback: busca no texto completo se não encontrou no cabeçalho
+  if (!dados.distribuidora) {
+    for (const [re, nome] of distribuidoras) {
+      if (re.test(t)) { dados.distribuidora = nome; break }
+    }
   }
 
   // ── Nome do titular (cliente) ─────────────────────────────────────
@@ -722,13 +588,7 @@ export function extrairDadosFatura(texto: string): DadosFatura {
 
   // ── Histórico de consumo (tabela dos 12 meses) ────────────────────
   const historico = extrairHistoricoConsumo(t)
-  if (historico.length > 0) {
-    dados.historico = historico
-  } else {
-    // Fallback: Grupo B não tem rótulos de ponta/fora-ponta
-    const historicoB = extrairHistoricoGrupoB(t)
-    if (historicoB.length > 0) dados.historico = historicoB
-  }
+  if (historico.length > 0) dados.historico = historico
 
   return dados
 }
