@@ -178,8 +178,8 @@ export default async function Home() {
             {[
               {
                 step: '01',
-                title: 'Cadastre sua unidade',
-                desc: 'Informe a distribuidora e os dados básicos da unidade consumidora. Leva menos de 1 minuto.',
+                title: 'Crie sua Conta',
+                desc: 'Cadastre-se gratuitamente em segundos. Sem cartão de crédito, sem burocracia.',
               },
               {
                 step: '02',
