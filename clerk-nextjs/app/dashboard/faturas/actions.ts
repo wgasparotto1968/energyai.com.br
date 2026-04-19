@@ -1,6 +1,7 @@
 'use server'
 
 import { currentUser } from '@clerk/nextjs/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { supabaseAdmin } from '@/lib/supabase'
 import { extractTextFromPdf } from '@/lib/pdfExtract'
@@ -140,7 +141,7 @@ export async function enviarFatura(
         consumoKwh: dadosExtraidos.consumoKwh ?? null,
         arquivoUrl,
         textoOcr,
-        dadosJson: { extraido: dadosExtraidos, resultado } as unknown as import('@prisma/client').Prisma.JsonObject,
+        dadosJson: { extraido: dadosExtraidos, resultado } as unknown as Prisma.JsonObject,
         status: 'CONCLUIDA',
       },
     })

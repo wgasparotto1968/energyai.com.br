@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================================================
+// PARÂMETROS REGULATÓRIOS (LEIS, NORMAS E REGRAS ANEEL)
+// =====================================================================
+model ParametroRegulatorio {
+  id                  String    @id @default(uuid())
+  nome                String    @unique // Ex: "fator_potencia_minimo", "demanda_obrigacao_varejista"
+  valor               Float     // Ex: 0.92, 500, 0.05
+  unidade             String?   // Ex: "Decimal", "kW", "Percentual"
+  referenciaLegal     String?   // Ex: "REN 1.081/2023 - ANEEL"
+  
+  // Controle de Histórico (Time-travel)
+  dataVigenciaInicio  DateTime  @default(now())
+  dataVigenciaFim     DateTime? // Fica nulo até a regra ser revogada/alterada
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@map("parametros_regulatorios")
+}
+
+// =====================================================================
+// TARIFAS POR CONCESSIONÁRIA E MODALIDADE
+// =====================================================================
+model TarifaConcessionaria {
+  id                      String    @id @default(uuid())
+  concessionaria          String    // Ex: "CEMIG", "ENEL-SP"
+  grupo                   String    // Ex: "A" ou "B"
+  subgrupo                String    // Ex: "A4", "B3"
+  modalidade              String    // Ex: "Verde", "Azul", "Convencional"
+  
+  // Tarifas de Demanda (R$/kW) - Aplicável mais ao Grupo A
+  tarifaDemandaPonta      Float?
+  tarifaDemandaForaPonta  Float?
+  tarifaDemandaUnica      Float?    // Usado na modalidade Verde
+  
+  // Tarifas de Energia (R$/kWh)
+  tarifaEnergiaPonta      Float?
+  tarifaEnergiaIntermediaria Float? // Usado na Tarifa Branca (Grupo B)
+  tarifaEnergiaForaPonta  Float?
+  tarifaEnergiaUnica      Float?    // Usado no Grupo B Convencional
+  
+  // Controle de Histórico (Time-travel)
+  resolucaoHomologatoria  String?   // Ex: "REH nº 3.200/2024"
+  dataVigenciaInicio      DateTime  @default(now())
+  dataVigenciaFim         DateTime? 
+
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@map("tarifas_concessionarias")
+}

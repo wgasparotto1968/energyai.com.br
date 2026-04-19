@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { extractTextFromPdf } from '@/lib/pdfExtract'
 import { extrairDadosFatura } from '@/lib/analise/extrator'
@@ -64,7 +65,7 @@ export async function POST(
       where: { id },
       data: {
         textoOcr,
-        dadosJson: { extraido: dadosExtraidos, resultado } as unknown as import('@prisma/client').Prisma.JsonObject,
+        dadosJson: { extraido: dadosExtraidos, resultado } as unknown as Prisma.JsonObject,
         valorTotal: dadosExtraidos.valorTotal ?? fatura.valorTotal,
         consumoKwh: dadosExtraidos.consumoKwh ?? fatura.consumoKwh,
         status: 'CONCLUIDA',
@@ -133,7 +134,7 @@ export async function POST(
             where: { id: existente.id },
             data: {
               consumoKwh: entrada.consumoTotalKwh ?? null,
-              dadosJson: { extraido: extraidoHistorico, resultado: null } as unknown as import('@prisma/client').Prisma.JsonObject,
+              dadosJson: { extraido: extraidoHistorico, resultado: null } as unknown as Prisma.JsonObject,
               status: 'CONCLUIDA',
             },
           })
@@ -145,7 +146,7 @@ export async function POST(
               ano: entrada.ano,
               valorTotal: 0,
               consumoKwh: entrada.consumoTotalKwh ?? null,
-              dadosJson: { extraido: extraidoHistorico, resultado: null } as unknown as import('@prisma/client').Prisma.JsonObject,
+              dadosJson: { extraido: extraidoHistorico, resultado: null } as unknown as Prisma.JsonObject,
               status: 'CONCLUIDA',
             },
           })
