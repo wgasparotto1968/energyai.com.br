@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  nome      String?
+  plano     Plano    @default(FREE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  contas    Conta[]
+
+  @@map("users")
+}
+
+model Conta {
+  id            String   @id @default(cuid())
+  userId        String
+  distribuidora String
+  numeroCliente String?
+  endereco      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  titular       String?
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  faturas       Fatura[]
+
+  @@map("contas")
+}
+
+model Fatura {
+  id         String       @id @default(cuid())
+  contaId    String
+  mes        Int
+  ano        Int
+  valorTotal Float
+  consumoKwh Float?
+  arquivoUrl String?
+  textoOcr   String?
+  dadosJson  Json?
+  status     StatusFatura @default(PENDENTE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  conta      Conta        @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  @@unique([contaId, mes, ano])
+  @@map("faturas")
+}
+
+enum Plano {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum StatusFatura {
+  PENDENTE
+  PROCESSANDO
+  CONCLUIDA
+  ERRO
+}

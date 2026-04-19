@@ -1,0 +1,12 @@
+import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
+import pg from 'pg'
+const { Pool } = pg
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+const adapter = new PrismaPg(pool)
+const prisma = new PrismaClient({ adapter })
+
+const r = await prisma.conta.findMany({ select: { id: true, titular: true, distribuidora: true, numeroCliente: true, endereco: true } })
+console.log(JSON.stringify(r, null, 2))
+await prisma.$disconnect()
