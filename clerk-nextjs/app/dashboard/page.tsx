@@ -41,9 +41,10 @@ export default async function DashboardPage() {
   const plano = dbUser?.plano ?? 'FREE'
   const totalContas = dbUser?._count?.contas ?? 0
 
-  // Todas as faturas de todas as contas (flat + sorted) para busca
+  // Apenas faturas com PDF real (exclui registros históricos sem arquivoUrl)
   const todasFaturas = (dbUser?.contas ?? [])
     .flatMap((c) => c.faturas.map((f) => ({ ...f, distribuidora: c.distribuidora, titular: c.titular, numeroCliente: c.numeroCliente, endereco: c.endereco, contaId: c.id })))
+    .filter((f) => !!f.arquivoUrl)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
   const totalFaturas = (dbUser?.contas ?? []).reduce((s, c) => s + c.faturas.filter(f => !!f.arquivoUrl).length, 0)
