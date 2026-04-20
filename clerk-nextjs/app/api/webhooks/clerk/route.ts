@@ -56,13 +56,17 @@ export async function POST(req: Request) {
 
     const nome = [first_name, last_name].filter(Boolean).join(' ') || null
 
-    await prisma.user.create({
-      data: {
-        clerkId: id,
-        email,
-        nome,
-      },
-    })
+    // Se já existe um usuário com esse e-mail (ex: criou conta antes de usar Google),
+    // apenas atualiza o clerkId em vez de criar um duplicado
+    const existing = await prisma.user.findFirst({ where: { email } })
+    if (existing) {
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: { clerkId: id, nome: nome ?? existing.nome },
+      })
+    } else {
+      await prisma.user.create({ data: { clerkId: id, email, nome } })
+    }
   }
 
   // ── user.updated ──────────────────────────────────────────────────────────
