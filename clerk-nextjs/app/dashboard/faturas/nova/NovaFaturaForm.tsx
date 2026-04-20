@@ -27,15 +27,31 @@ export default function NovaFaturaForm() {
 
     setIsPending(true)
     try {
-      const res = await fetch('/api/faturas/upload', { method: 'POST', body: formData })
-      const result = await res.json()
-      if (result.error) {
-        setError(result.error)
-      } else if (result.redirectTo) {
-        router.push(result.redirectTo)
+      // Etapa 1: upload do PDF (rápido, sem OCR)
+      const res1 = await fetch('/api/faturas/upload', { method: 'POST', body: formData })
+      let r1: { error?: string; faturaId?: string }
+      try { r1 = await res1.json() } catch {
+        const t = await res1.text().catch(() => '')
+        setError(`Erro no upload (${res1.status}): ${t.slice(0, 300) || 'resposta inválida'}`)
+        setIsPending(false)
+        return
       }
-    } catch {
-      setError('Erro de conexão. Verifique sua internet e tente novamente.')
+      if (r1.error) { setError(r1.error); setIsPending(false); return }
+      if (!r1.faturaId) { setError('Upload concluído mas ID da fatura não retornou.'); setIsPending(false); return }
+
+      // Etapa 2: OCR + análise (pode demorar até 60s)
+      const res2 = await fetch(`/api/faturas/${r1.faturaId}/processar`, { method: 'POST' })
+      let r2: { error?: string }
+      try { r2 = await res2.json() } catch { r2 = {} }
+      if (r2.error) {
+        // OCR falhou mas fatura foi salva — redireciona para ela com status PENDENTE
+        router.push(`/dashboard/faturas/${r1.faturaId}`)
+        return
+      }
+
+      router.push(`/dashboard/faturas/${r1.faturaId}`)
+    } catch (err) {
+      setError(`Erro de rede: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setIsPending(false)
     }

@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
 import { supabaseAdmin } from '@/lib/supabase'
-import { extractTextFromPdf } from '@/lib/pdfExtract'
-import { extrairDadosFatura } from '@/lib/analise/extrator'
-import { analisarFatura } from '@/lib/analise/engine'
 
-// Aumenta o timeout para 60s (Vercel Hobby suporta até 60s em API Routes)
-export const maxDuration = 60
+// Etapa 1: apenas salva o PDF e cria a fatura como PENDENTE (sem OCR).
+// O OCR é feito em /api/faturas/[id]/processar chamado logo em seguida.
+export const maxDuration = 30
 
 export async function POST(req: NextRequest) {
   const clerkUser = await currentUser()
@@ -31,21 +29,7 @@ export async function POST(req: NextRequest) {
   const bytes = await arquivo.arrayBuffer()
   const buffer = Buffer.from(bytes)
 
-  // ── 1. OCR + Extração ──────────────────────────────────────────────────────
-  let textoOcr = ''
-  let dadosExtraidos
-  let resultado
-
-  try {
-    textoOcr = await extractTextFromPdf(buffer)
-    dadosExtraidos = extrairDadosFatura(textoOcr)
-    resultado = analisarFatura(dadosExtraidos)
-  } catch (err) {
-    console.error('[upload] OCR error:', err)
-    return NextResponse.json({ error: 'Não foi possível ler o PDF. Verifique se o arquivo é uma fatura de energia válida.' }, { status: 422 })
-  }
-
-  // ── 2. Upsert usuário ──────────────────────────────────────────────────────
+  // ── 1. Upsert usuário ──────────────────────────────────────────────────────
   const dbUser = await prisma.user.upsert({
     where: { clerkId: clerkUser.id },
     update: {},
@@ -56,13 +40,7 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  // ── 3. Determinar mês/ano ──────────────────────────────────────────────────
-  const mesForm = parseInt(formData.get('mes') as string ?? '', 10)
-  const anoForm = parseInt(formData.get('ano') as string ?? '', 10)
-  const mesRef = mesForm > 0 && mesForm <= 12 ? mesForm : (dadosExtraidos.mesReferencia ?? new Date().getMonth() + 1)
-  const anoRef = anoForm > 0 ? anoForm : (dadosExtraidos.anoReferencia ?? new Date().getFullYear())
-
-  // ── 4. Encontrar ou criar Conta ────────────────────────────────────────────
+  // ── 2. Encontrar ou criar Conta ────────────────────────────────────────────
   const contaIdForm = (formData.get('contaId') as string | null)?.trim() || null
   let contaId: string
 
@@ -72,32 +50,21 @@ export async function POST(req: NextRequest) {
       if (!contaExistente) return NextResponse.json({ error: 'Unidade não encontrada.' }, { status: 404 })
       contaId = contaExistente.id
     } else {
-      const distribuidora = dadosExtraidos.distribuidora?.trim() || 'Desconhecida'
-      const numeroCliente = dadosExtraidos.numeroCliente?.trim() || null
-      const titular = dadosExtraidos.nomeCliente?.trim() || null
-
-      const contaMatch = await prisma.conta.findFirst({
-        where: { userId: dbUser.id, distribuidora, ...(numeroCliente ? { numeroCliente } : {}) },
+      // Conta temporária — o /processar atualiza distribuidora/titular após OCR
+      const novaConta = await prisma.conta.create({
+        data: { userId: dbUser.id, distribuidora: 'Desconhecida' },
       })
-
-      if (contaMatch) {
-        if (titular && !contaMatch.titular) {
-          await prisma.conta.update({ where: { id: contaMatch.id }, data: { titular } })
-        }
-        contaId = contaMatch.id
-      } else {
-        const novaConta = await prisma.conta.create({
-          data: { userId: dbUser.id, distribuidora, numeroCliente, titular },
-        })
-        contaId = novaConta.id
-      }
+      contaId = novaConta.id
     }
   } catch (err) {
     console.error('[upload] DB conta error:', err)
-    return NextResponse.json({ error: 'Erro ao localizar/criar unidade consumidora.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao criar unidade consumidora.' }, { status: 500 })
   }
 
-  // ── 5. Upload PDF ──────────────────────────────────────────────────────────
+  // ── 3. Upload PDF para Supabase ────────────────────────────────────────────
+  const now = new Date()
+  const mesRef = now.getMonth() + 1
+  const anoRef = now.getFullYear()
   const path = `faturas/${dbUser.id}/${contaId}/${anoRef}-${String(mesRef).padStart(2, '0')}-${Date.now()}.pdf`
 
   try {
@@ -117,33 +84,21 @@ export async function POST(req: NextRequest) {
   const { data: urlData } = supabaseAdmin.storage.from('faturas').getPublicUrl(path)
   const arquivoUrl = urlData.publicUrl
 
-  // ── 6. Verificar duplicata e criar Fatura ──────────────────────────────────
+  // ── 4. Criar Fatura como PENDENTE ──────────────────────────────────────────
   try {
-    const duplicata = await prisma.fatura.findUnique({
-      where: { contaId_mes_ano: { contaId, mes: mesRef, ano: anoRef } },
-    })
-    if (duplicata) {
-      return NextResponse.json(
-        { error: `Já existe uma fatura de ${String(mesRef).padStart(2, '0')}/${anoRef} para esta unidade.` },
-        { status: 409 }
-      )
-    }
-
     const fatura = await prisma.fatura.create({
       data: {
         contaId,
         mes: mesRef,
         ano: anoRef,
-        valorTotal: dadosExtraidos.valorTotal ?? 0,
-        consumoKwh: dadosExtraidos.consumoKwh ?? null,
+        valorTotal: 0,
         arquivoUrl,
-        textoOcr,
-        dadosJson: { extraido: dadosExtraidos, resultado } as unknown as import('@prisma/client').Prisma.JsonObject,
-        status: 'CONCLUIDA',
+        status: 'PENDENTE',
       },
     })
 
-    return NextResponse.json({ redirectTo: `/dashboard/faturas/${fatura.id}` })
+    // Retorna ID para o client chamar /processar em seguida
+    return NextResponse.json({ faturaId: fatura.id })
   } catch (err) {
     console.error('[upload] DB fatura error:', err)
     return NextResponse.json({ error: 'Erro ao salvar a fatura no banco de dados.' }, { status: 500 })
