@@ -1,15 +1,14 @@
 'use client'
 
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useRef, useState, useTransition } from 'react'
-import { enviarFatura } from '../actions'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Upload, FileText, X, Info } from 'lucide-react'
 
 export default function NovaFaturaForm() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [isPending, startTransition] = useTransition()
+  const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [arquivo, setArquivo] = useState<File | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -26,14 +25,20 @@ export default function NovaFaturaForm() {
     formData.set('arquivo', arquivo)
     if (contaId) formData.set('contaId', contaId)
 
-    startTransition(async () => {
-      const result = await enviarFatura(formData)
-      if ('error' in result) {
+    setIsPending(true)
+    try {
+      const res = await fetch('/api/faturas/upload', { method: 'POST', body: formData })
+      const result = await res.json()
+      if (result.error) {
         setError(result.error)
-      } else if ('redirectTo' in result) {
+      } else if (result.redirectTo) {
         router.push(result.redirectTo)
       }
-    })
+    } catch {
+      setError('Erro de conexão. Verifique sua internet e tente novamente.')
+    } finally {
+      setIsPending(false)
+    }
   }
 
   function handleFile(file: File | null) {
