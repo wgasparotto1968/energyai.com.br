@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { UserButton, SignOutButton } from '@clerk/nextjs'
 import {
   LayoutDashboard,
@@ -25,9 +26,7 @@ function Sidebar() {
     <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 flex flex-col">
       {/* Logo */}
       <Link href="/" className="flex items-center gap-2 px-6 py-5 border-b border-slate-800 hover:opacity-80 transition-opacity">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500">
-          <Zap className="h-5 w-5 text-white" />
-        </div>
+        <Image src="/logo2.png" alt="EnergyAI" width={58} height={58} />
         <span className="text-lg font-bold text-white">EnergyAI</span>
       </Link>
 

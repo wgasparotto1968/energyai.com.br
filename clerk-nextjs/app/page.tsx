@@ -1,4 +1,5 @@
 ﻿import Link from 'next/link'
+import Image from 'next/image'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import {
@@ -23,9 +24,7 @@ export default async function Home() {
       <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500">
-              <Zap className="h-5 w-5 text-white" />
-            </div>
+            <Image src="/logo2.png" alt="EnergyAI" width={58} height={58} loading="eager" />
             <span className="text-lg font-bold text-slate-900">EnergyAI</span>
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm text-slate-600">
@@ -52,15 +51,15 @@ export default async function Home() {
 
       {/* ── Hero ─────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-gradient-to-b from-slate-900 to-slate-800 text-white">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(34,197,94,0.2),transparent)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(249,115,22,0.2),transparent)]" />
         <div className="relative mx-auto max-w-5xl px-6 py-24 text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-green-500/30 bg-green-500/10 px-4 py-1.5 text-xs font-medium text-green-400">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-4 py-1.5 text-xs font-medium text-orange-400">
             <Zap className="h-3.5 w-3.5" />
             Análise inteligente de faturas de energia
           </div>
           <h1 className="mt-4 text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
             Reduza sua conta de luz<br />
-            <span className="text-green-400">com inteligência artificial</span>
+            <span className="text-orange-400">com inteligência artificial</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-300">
             Envie sua fatura de energia e receba em segundos uma análise completa com
@@ -70,7 +69,7 @@ export default async function Home() {
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
               href="/sign-up"
-              className="inline-flex items-center gap-2 rounded-xl bg-green-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-green-500/25 hover:bg-green-400 transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-orange-500/25 hover:bg-orange-400 transition-colors"
             >
               Analisar minha fatura grátis
               <ArrowRight className="h-5 w-5" />
@@ -82,9 +81,7 @@ export default async function Home() {
               Ver como funciona
             </a>
           </div>
-          <p className="mt-6 text-sm text-slate-500">
-            Grátis para começar · Sem cartão de crédito
-          </p>
+
         </div>
       </section>
 
@@ -92,7 +89,7 @@ export default async function Home() {
       <section className="border-b border-slate-100 bg-slate-50">
         <div className="mx-auto grid max-w-5xl grid-cols-2 gap-px md:grid-cols-4">
           {[
-            { value: 'até 40%', label: 'de economia estimada média' },
+            { value: 'até 85%', label: 'de economia estimada' },
             { value: '< 30s', label: 'para gerar a análise' },
             { value: 'Grupo A & B', label: 'todos os perfis atendidos' },
             { value: '100%', label: 'seguro e privado (LGPD)' },
@@ -334,10 +331,9 @@ export default async function Home() {
       {/* ── Footer ───────────────────────────────────────────────── */}
       <footer className="border-t border-slate-100 py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 text-sm text-slate-400 sm:flex-row">
+          <span className="text-slate-400">Created by Wegga Energy</span>
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded bg-green-500">
-              <Zap className="h-3.5 w-3.5 text-white" />
-            </div>
+            <Image src="/logo2.png" alt="EnergyAI" width={43} height={43} />
             <span className="font-semibold text-slate-600">EnergyAI</span>
             <span>© {new Date().getFullYear()}</span>
           </div>
