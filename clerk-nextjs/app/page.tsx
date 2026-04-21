@@ -50,10 +50,10 @@ export default async function Home() {
       </header>
 
       {/* ── Hero ─────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-slate-900 to-slate-800 text-white">
+      <section className="relative overflow-hidden bg-gradient-to-b from-[#0a1628] to-[#0f1e38] text-white">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(249,115,22,0.2),transparent)]" />
         <div className="relative mx-auto max-w-5xl px-6 py-24 text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-4 py-1.5 text-xs font-medium text-orange-400">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-5 py-2 text-sm font-medium text-orange-400">
             <Zap className="h-3.5 w-3.5" />
             Análise inteligente de faturas de energia
           </div>
@@ -76,7 +76,7 @@ export default async function Home() {
             </Link>
             <a
               href="#como-funciona"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-8 py-3.5 text-base font-medium text-slate-300 hover:border-slate-500 hover:text-white transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl border border-blue-700 px-8 py-3.5 text-base font-medium text-blue-200 hover:border-blue-500 hover:text-white transition-colors"
             >
               Ver como funciona
             </a>
@@ -309,7 +309,7 @@ export default async function Home() {
       </section>
 
       {/* ── CTA final ────────────────────────────────────────────── */}
-      <section className="bg-slate-900 py-20 text-center text-white">
+      <section className="bg-[#0a1628] py-20 text-center text-white">
         <div className="mx-auto max-w-2xl px-6">
           <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-green-500">
             <Zap className="h-6 w-6 text-white" />
